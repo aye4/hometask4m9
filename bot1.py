@@ -47,7 +47,9 @@ def parse_command(s: str) -> str:
     elif s[:4].lower() == "exit":
         return "Good bye!"
     elif s[:4].lower() == "help":
-        return "Valid commands are:\n---\nadd <user> <phone>\nchange <user> <phone>\nphone <user>\nshow all\nclose\nexit\ngood bye\n---"
+        return "Valid commands are:\n---\nadd <user> <phone>\nchange <user> <phone>\nphone <user>\nshow all\nclose\nexit\ngood bye\nhello\n---"
+    elif s[:5].lower() == "hello":
+        return "How can I help you?"
     elif s[:5].lower() == "close":
         return "Good bye!"
     elif s[:5].lower() == "phone":
