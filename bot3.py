@@ -23,6 +23,8 @@ class Field:
 class Phone(Field):
     @Field.value.setter
     def value(self, value):
+        if isinstance(value, int):
+            value = str(value)
         if len(value) == 12 and value.isdigit():
             Field.value.fset(self, value)
         else:
@@ -36,15 +38,9 @@ class Name(Field):
 class Birthday(Field):
     @Field.value.setter
     def value(self, value):
-        if search(r"^(0\d|1[012])-(0[1-9]|[12]\d|3[01])$", value):
-            d = datetime.strptime("1900-" + value, "%Y-%m-%d")
-        elif search(r"^(19\d\d|20[012]\d)-(0\d|1[012])-(0[1-9]|[12]\d|3[01])$", value):
-            d = datetime.strptime(value, "%Y-%m-%d")
-            if not datetime(year=1900, month=1, day=1) < d < datetime.now():
-                raise Exception(f"'{value}' is not a valid date")
-        else:
-            raise Exception("Birthday was not specified")
-        Field.value.fset(self, d)
+        if not datetime(year=1900, month=1, day=1) < value < datetime.now():
+            raise Exception(f"'{value}' is not a valid date")
+        Field.value.fset(self, value)
 
     def __str__(self) -> str:
         return self.value.strftime("%d %b") if self.value.year == 1900 else self.value.strftime("%d %b %Y")
@@ -64,13 +60,13 @@ class Record:
     def add_phone(self, phone) -> int:
         z = set(p.value for p in self.phone)
         n = 0
-        if type(phone) in (list, tuple):
+        if isinstance(phone, (list, tuple)):
             for p in phone:
                 if p.value not in z:
                     self.phone.append(p)
                     z.add(p.value)
                     n += 1
-        else:
+        elif phone:
             if phone.value not in z:
                 self.phone.append(phone)
                 n = 1
@@ -82,14 +78,14 @@ class Record:
             return self.add_phone(phone)
 
     def del_phone(self, phone) -> int:
-        n = 0
-        if phone:
-            phone_set = {x.value for x in phone} if type(phone) in (list, tuple) else {phone.value}
-            for p in self.phone:
-               if p.value in phone_set:
-                   self.phone.remove(p)
-                   n += 1
-        return n
+        phone_set = {x.value for x in phone} if isinstance(phone, (list, tuple)) else {phone.value}
+        for p in self.phone:
+            if p.value in phone_set:
+                phone_set.discard(p.value)
+                self.phone.remove(p)
+                if not phone_set:
+                    break
+        return phone_set
 
     def days_to_birthday(self) -> int:
         if self.birthday:
@@ -128,25 +124,8 @@ class IterPage:
 
 class AddressBook(UserDict):
     def add_record(self, name, birthday=None, phone=None) -> str:
-        if not name:
-            return "Username should be specified."
-        if name in self.data:
-            s = ""
-            if birthday and not self.data[name].birthday:
-                self.data[name].birthday = birthday
-                s = "birthday added"
-            n = self.data[name].add_phone(phone)
-            if n:
-                s += f", {n} phone number(s) added"
-            return f"{s} for user '{name}'." if s else "Check birthday and/or phone number(s)"
-        else:
-            self.data[name] = Record(name, birthday, phone)
-            n = len(self.data[name].phone)
-            s = f"{n} phone number(s)" if n else ""
-            s += "" if not birthday else " and a birthday" if s else "a birthday"
-            if s:
-                s = " with " + s
-            return f"Contact '{name}' added{s}."
+        self.data[name] = Record(name, birthday, phone)
+        return len(self.data[name].phone)
 
     def __str__(self) -> str:
         return RECORD_HEADER + "\n".join(str(v) for v in self.values())
@@ -156,6 +135,7 @@ class AddressBook(UserDict):
 
 
 d = AddressBook()
+log = []
 
 
 def input_error(f):
@@ -166,36 +146,58 @@ def input_error(f):
             r = "Please specify username and phone number"
         except KeyError:
             r = "No such username."
-        except Exception as e:
-            print("Exception!!!", e)
+        except IndexError:
+            r = "Please specify birthday and/or phone number"
         return r
     return wrapper
 
 
 def process_args(*args):
-    birthday = None
-    try:
-        birthday = Birthday(args[0])
-    except Exception as e:
-        if str(e).endswith(" is not a valid date"):
-            print(e)
-            args = args[1:]
-    else:
-        args = args[1:]
     phone = []
-    while args:
-        try:
-            phone.append(Phone(args[0]))
-        except Exception as e:
-            print(e)
-        finally:
+    # Check if birthday specified
+    birthday = None
+    if args:
+        x = args[0]
+        # mm-dd format
+        if search(r"^(0\d|1[012])-(0[1-9]|[12]\d|3[01])$", x):
+            x = "1900-" + x
+        # yyyy-mm-dd format
+        if search(r"^(19\d\d|20[012]\d)-(0\d|1[012])-(0[1-9]|[12]\d|3[01])$", x):
+            try:
+                birthday = Birthday(datetime.strptime(x, "%Y-%m-%d"))
+            except Exception as e:
+                print(e)
+                log.append(f"{args[0]} is not a valid date")
             args = args[1:]
+        # Phone list
+        while args:
+            try:
+                phone.append(Phone(args[0]))
+            except Exception as e:
+                log.append(str(e))
+            finally:
+                args = args[1:]
     return birthday, phone
 
 
 def add_h(user: str, *args) -> str:
     birthday, phone = process_args(*args)
-    return d.add_record(user, birthday, phone)
+    if user in d:
+        s = []
+        if birthday and not d[user].birthday:
+            d[user].birthday = birthday
+            s.append("Birthday added")
+        n = d[user].add_phone(phone)
+        if n:
+            s.append(f"{n} phone number(s) added")
+        return f"{', '.join(s)} for user '{user}'." if s else "Check birthday and/or phone number(s)"
+    else:
+        n = d.add_record(user, birthday, phone)
+        s = [f"{n} phone number(s)"] if n else []
+        if birthday:
+            s.append("a birthday")
+        s = " with " + " and ".join(s) if s else ""
+        return f"Contact '{user}' added{s}."
 
 
 def phone_h(user: str, *_) -> str:
@@ -226,13 +228,18 @@ def delete_h(user: str, *args) -> str:
             d[user].birthday = None
             s = ", birthday deleted"
     if phone:
-        n = d[user].del_phone(phone)
+        x = d[user].del_phone(phone)
+        n = len(phone) - len(x)
+        if x:
+            log.extend([f"Phone '{p}' was not found" for p in x])
         if n:
             s = ", {n} phone number(s) deleted"
     return f"Contact '{user}' changed{s}." if s else "Check birthday and/or phone number(s)"
 
 
 def show_all(*_) -> str:
+    if len(d) == 0:
+        return "Contact list is empty"
     for x in d.iterator(N):
         if x:
             print(RECORD_HEADER + "\n".join(str(d[r]) for r in x))
@@ -283,7 +290,7 @@ commands = {
 
 
 @input_error
-def parse_command(s: str) -> str:
+def parse_command(s: str):
     r = "Unrecognized command. Try typing 'help'."
     if s:
         x = s.split()
@@ -294,19 +301,22 @@ def parse_command(s: str) -> str:
             z = ' '.join(x[:2]).lower()
             if z in commands:
                 r = commands[z](*x[2:])
+    log.append(r)
     return r
 
 
 if __name__ == "__main__":
+    print(help_h())
     while True:
+        log = []
         try:
             s = input(f"{len(d)} contacts >").strip()
         except EOFError:
-            x = "Unrecognized command. Try typing 'help'."
+            log.append("Unrecognized command. Try typing 'help'.")
         except KeyboardInterrupt:
-            x = "\nUnrecognized command. Try typing 'help'."
+            log.append("\nUnrecognized command. Try typing 'help'.")
         else:
             x = parse_command(s)
-        print(x)
+        print('\n'.join(log))
         if x == "Good bye!":
             break
