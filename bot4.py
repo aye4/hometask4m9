@@ -21,13 +21,19 @@ A_EDIT_UPD_EM = 11
 A_EDIT_UPD_BD = 12
 A_EDIT_DELETE = 13
 MESSAGE = {
-    A_MAIN:"1 = Add new contact\n2 = Show all (easy way to select one)\n0 = Exit (Ctrl-C)\n" + LINE + "\nSelect an option or type some symbols to search by name/phone: ",
-    A_ADD:"\nYou are about to add new contact.\nUse Enter to skip, Ctrl+X to exit/main menu, F6/Ctrl-Z and Enter to finish\n" + LINE + "\nEnter a name (required): ",
+    A_MAIN:("1 = Add new contact\n2 = Show all (easy way to select one)\n0 = Exit (Ctrl+C)\n"
+        + LINE + "\nSelect an option or type some symbols to search by name/phone: "),
+    A_ADD:(LINE + "\nYou are about to add new contact.\n" + LINE
+        + "\nYou may leave the black field to skip (press Enter),"
+        + "\nEnter '-' command to go back to the previous value"
+        + "\nCtrl+Z and Enter (or F6 and Enter) to finish"
+        + "\nCtrl+C to exit/main menu\n"
+        + LINE + "\nEnter a name (required): "),
     A_ADD_BD:"Enter birthday (format is 'mm-dd' or 'yyyy-mm-dd', e.g. '05-21' or '1999-01-22'): ",
     A_ADD_EM:"Enter e-mail: ",
     A_ADD_PH:"Enter a list of 12-digit phone numbers separated by ' ' (e.g. 380501234567): ",
     A_EDIT:("1 = Add new phone(s)\n2 = Delete existing phone\n3 = Update e-mail\n4 = Update birthday\n5 = Delete e-mail\n"
-        + "6 = Delete birthday\n7 = Delete contact\n0 = Main menu (Ctrl-C)\n" + LINE + "\nSelect an option: "),
+        + "6 = Delete birthday\n7 = Delete contact\n0 = Main menu (Ctrl+C)\n" + LINE + "\nSelect an option: "),
     A_EDIT_ADD_PH:"\nEnter a list of 12-digit phone numbers separated by ' ' (e.g. 380501234567): ",
     A_EDIT_DEL_PH:LINE + "\nEnter row number for the phone to delete: ",
     A_EDIT_UPD_EM:"\nEnter e-mail: ",
@@ -139,11 +145,14 @@ class Record:
            and (
            bool(search(search_string.lower(), self.name.value.lower()))
            or search_string.isdigit()
-           and bool(search(search_string, '!'.join(p.value for p in self.phone)))
+           and bool(search(search_string, "!".join(p.value for p in self.phone)))
        ))
 
     def __str__(self) -> str:
         return "{:<20} {:<27} {:<30} {:<20}".format(str(self.name), str(self.birthday), str(self.email), ", ".join(str(p) for p in self.phone))
+
+    def print_with_header(self):
+        print("\n" + RECORD_HEADER + "\n   " + str(self) + "\n" + LINE + "\n")
 
 
 class AddressBook(UserDict):
@@ -183,7 +192,7 @@ class AddressBook(UserDict):
     def read_from_file(self):
         self.save_changes = False
         if self.file_path.exists():
-            with open(self.file_path, "r") as f:
+            with open(self.file_path, "r", encoding="utf-8") as f:
                 self.from_dict(json.load(f))
 
     def to_dict(self) -> dict:
@@ -196,7 +205,7 @@ class AddressBook(UserDict):
 
     def write_to_file(self):
         if self.save_changes:
-            with open(self.file_path, "w") as f:
+            with open(self.file_path, "w", encoding="utf-8") as f:
                 json.dump(self.to_dict(), f)
                 self.save_changes = False
 
@@ -214,11 +223,12 @@ d = AddressBook(pth)
 def add_sequence(user_input: str, selected: Record, action: int):
     if user_input == CTRL_C or action == A_ADD and (user_input == F6 or user_input == BACK):
         if len(d) == 0:
-            exit('Good bye!')
+            exit("Good bye!")
         else:
             return A_MAIN, None
     elif user_input == F6:
         d.add_record(selected)
+        selected.print_with_header()
         return A_MAIN, None
     elif user_input == BACK:
         if action == A_ADD_PH:
@@ -234,6 +244,7 @@ def add_sequence(user_input: str, selected: Record, action: int):
                 return action, selected
             elif selected:
                 selected.name.value = user_input
+                selected.print_with_header()
                 return A_ADD_BD, selected
             else:
                 return A_ADD_BD, Record(Name(user_input))
@@ -245,6 +256,7 @@ def add_sequence(user_input: str, selected: Record, action: int):
                 return action, selected
             else:
                 selected.birthday = birthday
+                selected.print_with_header()
                 return A_ADD_EM, selected
         elif action == A_ADD_EM:
             try:
@@ -254,6 +266,7 @@ def add_sequence(user_input: str, selected: Record, action: int):
                 return action, selected
             else:
                 selected.email = email
+                selected.print_with_header()
                 return A_ADD_PH, selected
         elif action == A_ADD_PH:
             for x in user_input.split():
@@ -265,6 +278,7 @@ def add_sequence(user_input: str, selected: Record, action: int):
                 else:
                     selected.add_phone(p)
             d.add_record(selected)
+            selected.print_with_header()
             return A_MAIN, None
     elif action == A_ADD_BD:
         return A_ADD_EM, selected
@@ -314,21 +328,20 @@ def edit_sequence(user_input: str, selected: Record, action: int):
         elif user_input == '7':
             return A_EDIT_DELETE, selected
         else:
-            print('\nUnrecognized command\n')
+            print("\nUnrecognized command\n")
     elif action == A_EDIT_ADD_PH:
-        if len(user_input) > 11:
-            print()
-            for x in user_input.split():
-                try:
-                    p = Phone(x)
-                except Exception as e:
-                    print(e)
+        print()
+        for x in user_input.split():
+            try:
+                p = Phone(x)
+            except Exception as e:
+                print(e)
+            else:
+                if d[selected.name.value].add_phone(p):
+                    print(f"Phone '{x}' added.")
+                    d.save_changes = True
                 else:
-                    if d[selected.name.value].add_phone(p):
-                        print(f"Phone '{x}' added.")
-                        d.save_changes = True
-                    else:
-                        print(f"Phone '{x}' already exists.")
+                    print(f"Phone '{x}' already exists.")
     elif action == A_EDIT_DEL_PH:
         if user_input.isdigit() and 0 < int(user_input) < len(selected.phone):
             x = selected.phone[int(user_input)]
@@ -379,16 +392,19 @@ def main_menu(user_input: str, selected: Record, action: int):
             for i, n in enumerate(x):
                 print("{:>2} ".format(i) + str(d[n]))
             try:
-                z = int(input("Press Enter to see next page or type a row number to select corresponding contact: ").strip())
-            except ValueError:
+                z = int(input("Press Enter to see next page or type a row number to select corresponding contact (Ctrl+C to exit): ").strip())
+            except (ValueError, EOFError):
                 continue
+            except KeyboardInterrupt:
+                print()
+                return A_MAIN, None
             else:
-                if 0 <= z <= len(x):
+                if 0 <= z < len(x):
                     print(f"\nContact '{x[z]}' selected\n")
                     return A_EDIT, d[x[z]]
         print(LINE)
     else:
-        print('\nUnrecognized command\n')
+        print("\nUnrecognized command\n")
     return A_MAIN, None
 
 
@@ -418,7 +434,7 @@ if __name__ == "__main__":
             if len(d) == 0:
                 action = A_ADD
         elif action == A_EDIT:
-            print(RECORD_HEADER + '\n   ' + str(selected) + "\n" + LINE)
+            selected.print_with_header()
         try:
             s = input(MESSAGE[action]).strip()
         except EOFError:
