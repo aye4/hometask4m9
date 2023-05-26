@@ -96,11 +96,20 @@ class Birthday(Field):
             raise Exception(f"'{value}' is not a valid date")
         Field.value.fset(self, birthday)
 
+    def replace_year(self, year: int) -> datetime:
+        def is_leap(year):
+            return year%4 == 0 and (year%100 != 0 or year%400 == 0)
+
+        if self.value.month == 2 and self.value.day == 29 and not is_leap(year):
+            return datetime(year=year, month=2, day=28)
+        else:
+            return self.value.replace(year=year)
+
     def days_to_birthday(self) -> int:
         todays_date = datetime.today()
-        birthday = datetime(year=todays_date.year, month=2, day=28) if self.value.month == 2 and self.value.day == 29 else self.value.replace(year=todays_date.year)
+        birthday = self.replace_year(todays_date.year)
         if todays_date > birthday:
-            birthday = birthday.replace(year=birthday.year + 1)
+            birthday = self.replace_year(todays_date.year + 1)
         return (birthday - todays_date).days
 
     def std_str(self, mode=None) -> str:
