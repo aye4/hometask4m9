@@ -97,13 +97,10 @@ class Birthday(Field):
         Field.value.fset(self, birthday)
 
     def replace_year(self, year: int) -> datetime:
-        def is_leap(year):
-            return year%4 == 0 and (year%100 != 0 or year%400 == 0)
-
-        if self.value.month == 2 and self.value.day == 29 and not is_leap(year):
-            return datetime(year=year, month=2, day=28)
-        else:
+        try:
             return self.value.replace(year=year)
+        except ValueError:
+            return datetime(year=year, month=2, day=28)
 
     def days_to_birthday(self) -> int:
         todays_date = datetime.today()
