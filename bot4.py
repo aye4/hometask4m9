@@ -6,7 +6,10 @@ from datetime import datetime
 from re import search
 
 DEFAULT_FILENAME = "ab.json"
-RECORD_HEADER = "## {:^20} {:^27} {:^30} {:^20}".format("User", "Birthday", "e-mail", "Phone number(s)") + "\n-- " + "-" * 20 + " " + "-" * 27  + " " + "-" * 30 + " " + "-" * 20
+RECORD_HEADER = (
+    "## {:^20} {:^27} {:^30} {:^20}".format("User", "Birthday", "e-mail", "Phone number(s)")
+    + "\n-- " + "-" * 20 + " " + "-" * 27 + " " + "-" * 30 + " " + "-" * 20
+)
 LINE = "-" * 30
 BACK = "-"
 A_MAIN = 0
@@ -21,34 +24,56 @@ A_EDIT_UPD_EM = 11
 A_EDIT_UPD_BD = 12
 A_EDIT_DELETE = 13
 MESSAGE = {
-    A_MAIN:("1 = Add new contact\n2 = Show all (easy way to select one)\n0 = Exit (Ctrl+C)\n"
-        + LINE + "\nSelect an option or type some symbols to search by name/phone: "),
-    A_ADD:(LINE + "\nYou are about to add new contact.\n" + LINE
+    A_MAIN: (
+        "1 = Add new contact\n"
+        + "2 = Show all (easy way to select one)\n"
+        + "0 = Exit (Ctrl+C)\n"
+        + LINE
+        + "\nSelect an option or type some symbols to search by name/phone: "
+    ),
+    A_ADD: (
+        LINE
+        + "\nYou are about to add new contact.\n"
+        + LINE
         + "\nYou may leave the black field to skip (press Enter),"
         + "\nEnter '-' command to go back to the previous value"
         + "\nCtrl+Z and Enter (or F6 and Enter) to finish"
         + "\nCtrl+C to exit/main menu\n"
-        + LINE + "\nEnter a name (required): "),
-    A_ADD_BD:"Enter birthday (format is 'mm-dd' or 'yyyy-mm-dd', e.g. '05-21' or '1999-01-22'): ",
-    A_ADD_EM:"Enter e-mail: ",
-    A_ADD_PH:"Enter a list of 12-digit phone numbers separated by ' ' (e.g. 380501234567): ",
-    A_EDIT:("1 = Add new phone(s)\n2 = Delete existing phone\n3 = Update e-mail\n4 = Update birthday\n5 = Delete e-mail\n"
-        + "6 = Delete birthday\n7 = Delete contact\n0 = Main menu (Ctrl+C)\n" + LINE + "\nSelect an option: "),
-    A_EDIT_ADD_PH:"\nEnter a list of 12-digit phone numbers separated by ' ' (e.g. 380501234567): ",
-    A_EDIT_DEL_PH:LINE + "\nEnter row number for the phone to delete: ",
-    A_EDIT_UPD_EM:"\nEnter e-mail: ",
-    A_EDIT_UPD_BD:"\nEnter birthday (format is 'mm-dd' or 'yyyy-mm-dd', e.g. '05-21' or '1999-01-22'): ",
-    A_EDIT_DELETE:"\nAre you sure you want to delete the selected contact (Y)?",
+        + LINE
+        + "\nEnter a name (required): "
+    ),
+    A_ADD_BD: "Enter birthday (format is 'mm-dd' or 'yyyy-mm-dd', e.g. '05-21' or '1999-01-22'): ",
+    A_ADD_EM: "Enter e-mail: ",
+    A_ADD_PH: "Enter a list of 12-digit phone numbers separated by ' ' (e.g. 380501234567): ",
+    A_EDIT: (
+        "1 = Add new phone(s)\n"
+        + "2 = Delete existing phone\n"
+        + "3 = Update e-mail\n"
+        + "4 = Update birthday\n"
+        + "5 = Delete e-mail\n"
+        + "6 = Delete birthday\n"
+        + "7 = Delete contact\n"
+        + "0 = Main menu (Ctrl+C)\n"
+        + LINE
+        + "\nSelect an option: "
+    ),
+    A_EDIT_ADD_PH: "\nEnter a list of 12-digit phone numbers separated by ' ' (e.g. 380501234567): ",
+    A_EDIT_DEL_PH: LINE + "\nEnter row number for the phone to delete: ",
+    A_EDIT_UPD_EM: "\nEnter e-mail: ",
+    A_EDIT_UPD_BD: "\nEnter birthday (format is 'mm-dd' or 'yyyy-mm-dd', e.g. '05-21' or '1999-01-22'): ",
+    A_EDIT_DELETE: "\nAre you sure you want to delete the selected contact (Y)?",
 }
 PAGE_SIZE = 5
+PAGE_MESSAGE = "Press Enter to see next page or type a row number to select corresponding contact (Ctrl+C to exit): "
 CTRL_C = "{~"
 F6 = "}~"
-MIN_YEAR = 1904
+MIN_YEAR = 1896
 NUMBER_FORMAT = 1
+
 
 class Field:
     def __init__(self, value=None):
-       self.value = value
+        self.value = value
 
     @property
     def value(self):
@@ -87,11 +112,17 @@ class Name(Field):
 class Birthday(Field):
     @Field.value.setter
     def value(self, value):
-        x = str(MIN_YEAR) + "-" + value if search(r"^(0\d|1[012])-(0[1-9]|[12]\d|3[01])$", value) else value
+        x = (
+            str(MIN_YEAR) + "-" + value
+            if search(r"^(0\d|1[012])-(0[1-9]|[12]\d|3[01])$", value)
+            else value
+        )
         try:
             birthday = datetime.strptime(x, "%Y-%m-%d")
         except ValueError:
-            raise Exception(f"'{value}' does not match the expected date format 'yyyy-mm-dd'")
+            raise Exception(
+                f"'{value}' does not match the expected date format 'yyyy-mm-dd'"
+            )
         if not datetime.today().year > birthday.year >= MIN_YEAR:
             raise Exception(f"'{value}' is not a valid date")
         Field.value.fset(self, birthday)
@@ -148,17 +179,20 @@ class Record:
             self.phone.remove(phone)
             return True
 
-    def is_search_condition(self, search_string: str) -> bool:
+    def is_in(self, search_string: str) -> bool:
         if len(search_string) <= 1:
             return False
         if search(search_string.lower(), self.name.value.lower()):
             return True
-        if search_string.isdigit() and search(search_string, "!".join(p.value for p in self.phone)):
+        if search_string.isdigit() and search(
+            search_string, "!".join(p.value for p in self.phone)
+        ):
             return True
         return False
 
     def __str__(self) -> str:
-        return "{:<20} {:<27} {:<30} {:<20}".format(str(self.name), str(self.birthday), str(self.email), ", ".join(str(p) for p in self.phone))
+        phones = ", ".join(str(p) for p in self.phone)
+        return f"{str(self.name):<20} {str(self.birthday):<27} {str(self.email):<30} {phones:<20}"
 
     def print_with_header(self):
         print("\n" + RECORD_HEADER + "\n   " + str(self) + "\n" + LINE + "\n")
@@ -185,17 +219,20 @@ class AddressBook(UserDict):
         return RECORD_HEADER + "\n".join(str(v) for v in self.values())
 
     def select(self, size=PAGE_SIZE, search_string=None):
-        names = sorted(k for k, v in self.data.items() if v.is_search_condition(search_string)) if search_string else sorted(self.data.keys())
+        if search_string:
+            names = sorted(k for k, v in self.data.items() if v.is_in(search_string))
+        else:
+            names = sorted(self.data.keys())
         for i in range(0, len(names), size):
-            yield names[i:i + size]
+            yield names[i : i + size]
 
     def from_dict(self, source_dict: dict):
         for k, v in source_dict.items():
             self.data[k] = Record(
-                Name(v['name']),
-                birthday=Birthday(v['birthday']) if v['birthday'] else None,
-                email=Email(v['email']) if v['email'] else None,
-                phone=[Phone(x) for x in v['phone']]
+                Name(v["name"]),
+                birthday=Birthday(v["birthday"]) if v["birthday"] else None,
+                email=Email(v["email"]) if v["email"] else None,
+                phone=[Phone(x) for x in v["phone"]],
             )
 
     def read_from_file(self):
@@ -205,12 +242,16 @@ class AddressBook(UserDict):
                 self.from_dict(json.load(f))
 
     def to_dict(self) -> dict:
-        return {k:{
-            'name':v.name.value,
-            'birthday':v.birthday.std_str(mode=NUMBER_FORMAT) if v.birthday else None,
-            'email':v.email.value if v.email else None,
-            'phone':[p.value for p in v.phone]
-        } for k, v in self.data.items()}
+        return {
+            k: {
+                "name": v.name.value,
+                "birthday": v.birthday.std_str(mode=NUMBER_FORMAT)
+                if v.birthday else None,
+                "email": v.email.value if v.email else None,
+                "phone": [p.value for p in v.phone],
+            }
+            for k, v in self.data.items()
+        }
 
     def write_to_file(self):
         if self.save_changes:
@@ -230,7 +271,10 @@ d = AddressBook(pth)
 
 
 def add_sequence(user_input: str, selected: Record, action: int):
-    if user_input == CTRL_C or action == A_ADD and (user_input == F6 or user_input == BACK):
+    if (
+        user_input == CTRL_C
+        or action == A_ADD and (user_input == F6 or user_input == BACK)
+    ):
         if len(d) == 0:
             exit("Good bye!")
         else:
@@ -303,14 +347,16 @@ def add_sequence(user_input: str, selected: Record, action: int):
 
 def edit_sequence(user_input: str, selected: Record, action: int):
     if action == A_EDIT:
-        if user_input == CTRL_C or user_input == '0':
+        if user_input == CTRL_C or user_input == "0":
             return A_MAIN, None
-        elif user_input == '1':
+        elif user_input == "1":
             return A_EDIT_ADD_PH, selected
-        elif user_input == '2':
+        elif user_input == "2":
             if selected.phone:
                 if len(selected.phone) > 1:
-                    print("\n" + "\n".join(f"{i} = {p.value}" for i, p in enumerate(selected.phone)))
+                    print()
+                    for i, p in enumerate(selected.phone):
+                        print(f"{i} = {p.value}")
                     return A_EDIT_DEL_PH, selected
                 else:
                     print(str(selected.phone[0]))
@@ -319,22 +365,22 @@ def edit_sequence(user_input: str, selected: Record, action: int):
                     d.save_changes = True
             else:
                 print("\nPhone list is empty\n")
-        elif user_input == '3':
+        elif user_input == "3":
             print(f"", end="")
             return A_EDIT_UPD_EM, selected
-        elif user_input == '4':
+        elif user_input == "4":
             return A_EDIT_UPD_BD, selected
-        elif user_input == '5':
+        elif user_input == "5":
             if selected.email:
                 print(f"\nE-mail '{selected.email.value}' has been deleted.\n")
                 d[selected.name.value].email = None
                 d.save_changes = True
-        elif user_input == '6':
+        elif user_input == "6":
             if selected.birthday:
                 print(f"\nBirthday '{selected.birthday.std_str()}' has been deleted.\n")
                 d[selected.name.value].birthday = None
                 d.save_changes = True
-        elif user_input == '7':
+        elif user_input == "7":
             return A_EDIT_DELETE, selected
         else:
             print("\nUnrecognized command\n")
@@ -376,7 +422,7 @@ def edit_sequence(user_input: str, selected: Record, action: int):
             print(f"\nBirthday {birthday.std_str()} added.\n")
             d[selected.name.value].birthday = birthday
             d.save_changes = True
-    elif action == A_EDIT_DELETE and user_input.upper() == 'Y':
+    elif action == A_EDIT_DELETE and user_input.upper() == "Y":
         print(f"\nContact '{selected.name.value}' has been deleted\n")
         d.delete_record(selected.name.value)
         return A_MAIN, None
@@ -384,24 +430,28 @@ def edit_sequence(user_input: str, selected: Record, action: int):
 
 
 def main_menu(user_input: str, selected: Record, action: int):
-    if user_input == '1':
+    if user_input == "1":
         return A_ADD, None
-    elif user_input == '0' or user_input == CTRL_C:
+    elif user_input == "0" or user_input == CTRL_C:
         d.write_to_file()
         exit("Good bye!")
     elif user_input in d:
         print(f"\nContact '{user_input}' selected\n")
         return A_EDIT, d[user_input]
-    elif user_input == '2' or len(user_input) > 1:
-        s = "" if user_input == '2' else user_input
-        msg = f"\nSearch pattern = '{user_input}'\n" if s else "\n'Show all contacts' selected\n"
+    elif user_input == "2" or len(user_input) > 1:
+        s = "" if user_input == "2" else user_input
+        msg = (
+            f"\nSearch pattern = '{user_input}'\n"
+            if s
+            else "\n'Show all contacts' selected\n"
+        )
         print(msg)
         for x in d.select(PAGE_SIZE, s):
             print(RECORD_HEADER)
             for i, n in enumerate(x):
                 print("{:>2} ".format(i) + str(d[n]))
             try:
-                z = int(input("Press Enter to see next page or type a row number to select corresponding contact (Ctrl+C to exit): ").strip())
+                z = int(input(PAGE_MESSAGE).strip())
             except (ValueError, EOFError):
                 continue
             except KeyboardInterrupt:
@@ -428,10 +478,10 @@ menu_functions = {
     A_EDIT_DEL_PH: edit_sequence,
     A_EDIT_UPD_EM: edit_sequence,
     A_EDIT_UPD_BD: edit_sequence,
-    A_EDIT_DELETE: edit_sequence
+    A_EDIT_DELETE: edit_sequence,
 }
 
-    
+
 if __name__ == "__main__":
     action = A_MAIN
     selected = None
