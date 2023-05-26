@@ -43,7 +43,7 @@ MESSAGE = {
 PAGE_SIZE = 5
 CTRL_C = "{~"
 F6 = "}~"
-MIN_YEAR = 1900
+MIN_YEAR = 1904
 NUMBER_FORMAT = 1
 
 class Field:
