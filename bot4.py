@@ -43,6 +43,8 @@ MESSAGE = {
 PAGE_SIZE = 5
 CTRL_C = "{~"
 F6 = "}~"
+MIN_YEAR = 1900
+NUMBER_FORMAT = 1
 
 class Field:
     def __init__(self, value=None):
@@ -85,26 +87,27 @@ class Name(Field):
 class Birthday(Field):
     @Field.value.setter
     def value(self, value):
-        x = "1900-" + value if search(r"^(0\d|1[012])-(0[1-9]|[12]\d|3[01])$", value) else value
-        birthday = datetime.strptime(x, "%Y-%m-%d") if search(r"^(19\d\d|20[012]\d)-(0\d|1[012])-(0[1-9]|[12]\d|3[01])$", x) else None
-        if not datetime(year=1900, month=1, day=1) < birthday < datetime.now():
+        x = str(MIN_YEAR) + "-" + value if search(r"^(0\d|1[012])-(0[1-9]|[12]\d|3[01])$", value) else value
+        try:
+            birthday = datetime.strptime(x, "%Y-%m-%d")
+        except ValueError:
+            raise Exception(f"'{value}' does not match the expected date format 'yyyy-mm-dd'")
+        if not datetime.today().year > birthday.year >= MIN_YEAR:
             raise Exception(f"'{value}' is not a valid date")
         Field.value.fset(self, birthday)
 
     def days_to_birthday(self) -> int:
-        n = datetime.now()
-        m = self.value.month
-        d = self.value.day
-        y = n.year
-        if m < n.month or m == n.month and d < n.day:
-            y += 1
-        return (datetime(year=y, month=m, day=d) - n).days
+        todays_date = datetime.today()
+        birthday = datetime(year=todays_date.year, month=2, day=28) if self.value.month == 2 and self.value.day == 29 else self.value.replace(year=todays_date.year)
+        if todays_date > birthday:
+            birthday = birthday.replace(year=birthday.year + 1)
+        return (birthday - todays_date).days
 
     def std_str(self, mode=None) -> str:
-        if mode:
-            return self.value.strftime("%m-%d") if self.value.year == 1900 else self.value.strftime("%Y-%m-%d")
-        else:
-            return self.value.strftime("%d %b") if self.value.year == 1900 else self.value.strftime("%d %b %Y")
+        format_string = "%d %b" if self.value.year == MIN_YEAR else "%d %b %Y"
+        if mode == NUMBER_FORMAT:
+            format_string = "%m-%d" if self.value.year == MIN_YEAR else "%Y-%m-%d"
+        return self.value.strftime(format_string)
 
     def __str__(self) -> str:
         return f"{self.std_str()} ({self.days_to_birthday()} days left)"
@@ -123,16 +126,16 @@ class Record:
         return phone.value in set(p.value for p in self.phone) if self.phone else False
 
     def add_phone(self, phone):
-        n = 0
+        add_counter = 0
         if isinstance(phone, list):
             for p in phone:
                 if not self.is_phone(p):
                     self.phone.append(p)
-                    n += 1
+                    add_counter += 1
         elif not self.is_phone(phone):
             self.phone.append(phone)
-            n = 1
-        return n
+            add_counter = 1
+        return add_counter
 
     def del_phone(self, phone):
         if self.is_phone(phone):
@@ -140,13 +143,13 @@ class Record:
             return True
 
     def is_search_condition(self, search_string: str) -> bool:
-       return (
-           (len(search_string) > 1)
-           and (
-           bool(search(search_string.lower(), self.name.value.lower()))
-           or search_string.isdigit()
-           and bool(search(search_string, "!".join(p.value for p in self.phone)))
-       ))
+        if len(search_string) <= 1:
+            return False
+        if search(search_string.lower(), self.name.value.lower()):
+            return True
+        if search_string.isdigit() and search(search_string, "!".join(p.value for p in self.phone)):
+            return True
+        return False
 
     def __str__(self) -> str:
         return "{:<20} {:<27} {:<30} {:<20}".format(str(self.name), str(self.birthday), str(self.email), ", ".join(str(p) for p in self.phone))
@@ -198,7 +201,7 @@ class AddressBook(UserDict):
     def to_dict(self) -> dict:
         return {k:{
             'name':v.name.value,
-            'birthday':v.birthday.std_str(mode=1) if v.birthday else None,
+            'birthday':v.birthday.std_str(mode=NUMBER_FORMAT) if v.birthday else None,
             'email':v.email.value if v.email else None,
             'phone':[p.value for p in v.phone]
         } for k, v in self.data.items()}
@@ -252,7 +255,7 @@ def add_sequence(user_input: str, selected: Record, action: int):
             try:
                 birthday = Birthday(user_input)
             except Exception as e:
-                print(f"'{user_input}' is not a valid date")
+                print(e)
                 return action, selected
             else:
                 selected.birthday = birthday
@@ -329,6 +332,8 @@ def edit_sequence(user_input: str, selected: Record, action: int):
             return A_EDIT_DELETE, selected
         else:
             print("\nUnrecognized command\n")
+    elif user_input in (CTRL_C, F6):
+        return A_EDIT, selected
     elif action == A_EDIT_ADD_PH:
         print()
         for x in user_input.split():
@@ -349,24 +354,22 @@ def edit_sequence(user_input: str, selected: Record, action: int):
             d[selected.name.value].del_phone(x)
             d.save_changes = True
     elif action == A_EDIT_UPD_EM:
-        if user_input != CTRL_C:
-            try:
-                email = Email(user_input)
-            except:
-                print(f"\n'{user_input}' is not a valid e-mail.\n")
-            else:
-                d[selected.name.value].email = email
-                d.save_changes = True
+        try:
+            email = Email(user_input)
+        except:
+            print(f"\n'{user_input}' is not a valid e-mail.\n")
+        else:
+            d[selected.name.value].email = email
+            d.save_changes = True
     elif action == A_EDIT_UPD_BD:
-        if len(user_input) >= 5:
-            try:
-                birthday = Birthday(user_input)
-            except Exception as e:
-                print(f"'{user_input}' is not a valid date")
-            else:
-                print(f"\nBirthday {birthday.std_str()} added.\n")
-                d[selected.name.value].birthday = birthday
-                d.save_changes = True
+        try:
+            birthday = Birthday(user_input)
+        except Exception as e:
+            print(e)
+        else:
+            print(f"\nBirthday {birthday.std_str()} added.\n")
+            d[selected.name.value].birthday = birthday
+            d.save_changes = True
     elif action == A_EDIT_DELETE and user_input.upper() == 'Y':
         print(f"\nContact '{selected.name.value}' has been deleted\n")
         d.delete_record(selected.name.value)
