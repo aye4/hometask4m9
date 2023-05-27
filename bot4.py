@@ -42,7 +42,7 @@ MESSAGE = {
         + LINE
         + "\nEnter a name (required): "
     ),
-    A_ADD_BD: "Enter birthday (format is 'mm-dd' or 'yyyy-mm-dd', e.g. '05-21' or '1999-01-22'): ",
+    A_ADD_BD: "Enter birthday (format is 'mm-dd' or 'yyyy-mm-dd', e.g. '5-21' or '1999-10-22'): ",
     A_ADD_EM: "Enter e-mail: ",
     A_ADD_PH: "Enter a list of 12-digit phone numbers separated by ' ' (e.g. 380501234567): ",
     A_EDIT: (
@@ -112,16 +112,12 @@ class Name(Field):
 class Birthday(Field):
     @Field.value.setter
     def value(self, value):
-        x = (
-            str(MIN_YEAR) + "-" + value
-            if search(r"^(0\d|1[012])-(0[1-9]|[12]\d|3[01])$", value)
-            else value
-        )
+        x = str(MIN_YEAR) + "-" + value if search(r"^\d{1,2}-\d{1,2}$", value) else value
         try:
             birthday = datetime.strptime(x, "%Y-%m-%d")
         except ValueError:
             raise Exception(
-                f"'{value}' does not match the expected date format 'yyyy-mm-dd'"
+                f"'{value}' does not match the expected date format ('yyyy-mm-dd' or 'mm-dd')"
             )
         if not datetime.today().year > birthday.year >= MIN_YEAR:
             raise Exception(f"'{value}' is not a valid date")
@@ -439,13 +435,12 @@ def main_menu(user_input: str, selected: Record, action: int):
         print(f"\nContact '{user_input}' selected\n")
         return A_EDIT, d[user_input]
     elif user_input == "2" or len(user_input) > 1:
-        s = "" if user_input == "2" else user_input
-        msg = (
-            f"\nSearch pattern = '{user_input}'\n"
-            if s
-            else "\n'Show all contacts' selected\n"
-        )
-        print(msg)
+        if user_input == "2":
+            s = ""
+            print("\n'Show all contacts' selected\n")
+        else:
+            s = user_input
+            print(f"\nSearch pattern = '{user_input}'\n")
         for x in d.select(PAGE_SIZE, s):
             print(RECORD_HEADER)
             for i, n in enumerate(x):
